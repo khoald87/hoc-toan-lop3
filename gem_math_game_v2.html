@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siêu Ứng Dụng - Chinh Phục Toán Lớp 3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+        }
+        .main-view {
+            transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+        }
+        .main-view.hidden {
+            display: none;
+        }
+        .game-screen { /* For game overlay screens */
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .game-screen.hidden {
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+            position: absolute;
+        }
+        .timer-bar-inner {
+            transition: width 0.2s linear, background-color 0.5s ease;
+        }
+        .highlight-player {
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.8);
+            border: 2px solid #facc15;
+        }
+        .btn-primary {
+            background-color: #facc15; /* yellow-400 */
+            color: #422006; /* amber-950 */
+            box-shadow: 0 4px #d97706; /* amber-600 */
+        }
+        .btn-primary:hover {
+            background-color: #fde047; /* yellow-300 */
+        }
+        .btn-primary:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px #d97706;
+        }
+        .btn-answer {
+             background-color: #38bdf8; /* sky-400 */
+             color: white;
+             box-shadow: 0 4px #0284c7; /* sky-600 */
+        }
+         .btn-answer:hover {
+             background-color: #7dd3fc; /* sky-300 */
+         }
+         .btn-answer:disabled {
+            opacity: 0.8 !important;
+         }
+         .btn-choice {
+            background-color: rgba(255,255,255,0.3);
+            transition: background-color 0.2s;
+         }
+         .btn-choice:hover {
+            background-color: rgba(255,255,255,0.5);
+         }
+         .btn-choice-active {
+            background-color: #facc15;
+            color: #422006;
+            font-weight: bold;
+         }
+         .nav-button.active { background-color: #FFC09F; color: #4a2c2a; }
+        .content-card { transition: transform 0.3s, box-shadow 0.3s; background-color: #FFF; }
+        .content-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .quiz-option { transition: background-color 0.2s; }
+        .quiz-option.correct { background-color: #A0E7E5 !important; border-color: #006A71; }
+        .quiz-option.incorrect { background-color: #FFAEBC !important; border-color: #D83A56; }
+        .chart-container { position: relative; width: 100%; max-width: 400px; margin-left: auto; margin-right: auto; height: 250px; max-height: 300px; }
+        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #BC4749; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #interactive-clock-canvas { cursor: grab; }
+        #interactive-clock-canvas:active { cursor: grabbing; }
+        .converter-tab {
+            transition: all 0.2s ease-in-out;
+            border-bottom: 3px solid transparent;
+        }
+        .converter-tab.active {
+            color: #60a5fa;
+            border-bottom-color: #60a5fa;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-6 max-w-4xl">
+        <header class="text-center mb-6">
+            <h1 class="text-4xl md:text-5xl font-bold text-white" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Chinh Phục Toán Lớp 3</h1>
+            <p class="text-lg text-white/90 mt-2">Học mà chơi, chơi mà học với Trợ lý AI Gemini ✨</p>
+        </header>
+
+        <nav class="sticky top-2 z-20 bg-white/30 backdrop-blur-md rounded-full shadow-lg mb-8 p-2 flex justify-center items-center gap-1 md:gap-3">
+            <button onclick="showView('game')" id="nav-game" class="nav-button active text-sm md:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-300">🎮 Chơi Game</button>
+            <button onclick="showView('learn')" id="nav-learn" class="nav-button text-sm md:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-300">📚 Học & Luyện Tập</button>
+            <button onclick="showView('challenge')" id="nav-challenge" class="nav-button text-sm md:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-300">🏆 Thử Thách AI</button>
+            <button onclick="showView('tools')" id="nav-tools" class="nav-button text-sm md:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-300">🛠️ Công Cụ</button>
+        </nav>
+        
+        <main id="main-content">
+            <!-- View Game Start -->
+            <div id="game-view" class="main-view">
+                 <div class="w-full max-w-md mx-auto relative">
+                    <div id="start-screen" class="game-screen p-8 rounded-2xl shadow-2xl text-center" style="opacity: 1; transform: scale(1); position: static;">
+                        <h1 class="text-5xl font-bold text-white mb-4" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Thử Thách Toán Học</h1>
+                        <p class="text-white/90 mb-6 text-lg">Hãy nhập tên của bạn để bắt đầu!</p>
+                        <input id="player-name" type="text" placeholder="Nhập tên của bạn..." class="w-full p-3 bg-white/80 rounded-lg border border-white/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 text-center text-lg mb-6 text-gray-800 placeholder-gray-500">
+                        <p class="text-white/90 mb-3 text-lg">Chọn số câu hỏi:</p>
+                        <div id="question-choice-container" class="grid grid-cols-4 gap-2 mb-6">
+                            <button class="p-3 rounded-lg text-white btn-choice btn-choice-active" data-questions="10">10</button>
+                            <button class="p-3 rounded-lg text-white btn-choice" data-questions="15">15</button>
+                            <button class="p-3 rounded-lg text-white btn-choice" data-questions="20">20</button>
+                            <button class="p-3 rounded-lg text-white btn-choice" data-questions="30">30</button>
+                        </div>
+                        <p class="text-white/90 mb-3 text-lg">Chọn thời gian mỗi câu:</p>
+                        <div id="time-choice-container" class="grid grid-cols-4 gap-2 mb-8">
+                            <button class="p-3 rounded-lg text-white btn-choice" data-time="20">20s</button>
+                            <button class="p-3 rounded-lg text-white btn-choice btn-choice-active" data-time="30">30s</button>
+                            <button class="p-3 rounded-lg text-white btn-choice" data-time="45">45s</button>
+                            <button class="p-3 rounded-lg text-white btn-choice" data-time="60">60s</button>
+                        </div>
+                        <button id="start-btn" class="w-full p-4 btn-primary rounded-lg text-xl font-bold transition-all transform hover:scale-105">Bắt Đầu Chơi</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View Học & Luyện Tập -->
+            <div id="learn-view" class="main-view hidden"></div>
+
+            <!-- View Thử thách AI -->
+            <div id="challenge-view" class="main-view hidden"></div>
+
+            <!-- View Công cụ -->
+            <div id="tools-view" class="main-view hidden"></div>
+        </main>
+    </div>
+
+    <!-- Game Screens (Overlay) -->
+    <div id="game-overlay-container" class="fixed inset-0 z-30 flex items-center justify-center p-4 pointer-events-none">
+        <div class="w-full max-w-md mx-auto relative">
+             <div id="game-screen" class="game-screen hidden p-6 sm:p-8 rounded-2xl shadow-2xl">
+                <div class="flex justify-between items-center mb-4">
+                    <div><span class="text-white/80">Điểm số</span><p id="score" class="text-3xl font-bold text-white">0</p></div>
+                    <div><span class="text-white/80">Câu hỏi</span><p id="question-counter" class="text-3xl font-bold text-white">1 / 10</p></div>
+                </div>
+                <div class="relative mb-6">
+                    <div id="timer-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-lg font-bold z-10 text-white">30s</div>
+                    <div class="w-full bg-white/30 rounded-full h-8 overflow-hidden"><div id="timer-bar" class="bg-green-500 h-full rounded-full timer-bar-inner" style="width: 100%;"></div></div>
+                </div>
+                <div id="question-container" class="bg-white/80 p-6 rounded-lg text-center mb-6 min-h-[140px] flex flex-col items-center justify-center shadow-inner">
+                    <p id="question-text" class="font-bold tracking-wider text-gray-800"></p>
+                    <div id="question-image-container" class="mt-4"></div>
+                </div>
+                <div id="answers-container" class="grid grid-cols-2 gap-4"></div>
+                <button id="mute-btn" class="absolute top-4 right-4 text-white/70 hover:text-white transition-colors">
+                    <svg id="speaker-on-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                    <svg id="speaker-off-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path stroke-linecap="round" stroke-linejoin="round" d="M17 14l-4-4m0 4l4-4" /></svg>
+                </button>
+            </div>
+            <div id="end-screen" class="game-screen hidden p-8 rounded-2xl shadow-2xl text-center">
+                <h1 class="text-5xl font-bold text-white mb-2" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Hoàn Thành!</h1>
+                <div class="grid grid-cols-2 gap-4 my-6">
+                    <div><p class="text-white/80 mb-1">Điểm số</p><p id="final-score" class="text-5xl font-bold text-white"></p></div>
+                    <div><p class="text-white/80 mb-1">Thời gian</p><p id="total-time" class="text-5xl font-bold text-white"></p></div>
+                </div>
+                <h2 class="text-2xl font-bold mb-4 border-t border-white/30 pt-6 text-white">Bảng Xếp Hạng</h2>
+                <div id="leaderboard" class="space-y-2 text-left"></div>
+                <button id="play-again-btn" class="w-full mt-8 p-4 btn-primary rounded-lg text-xl font-bold transition-all transform hover:scale-105">Chơi Lại</button>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+    // --- MERGED SCRIPT FROM BOTH APPLICATIONS ---
+
+    // --- DOM ELEMENT SELECTORS ---
+    const gameView = document.getElementById('game-view');
+    const learnView = document.getElementById('learn-view');
+    const challengeView = document.getElementById('challenge-view');
+    const toolsView = document.getElementById('tools-view');
+    
+    // Game elements
+    const gameOverlayContainer = document.getElementById('game-overlay-container');
+    const startScreen = document.getElementById('start-screen');
+    const gameScreen = document.getElementById('game-screen');
+    const endScreen = document.getElementById('end-screen');
+    const startBtn = document.getElementById('start-btn');
+    const playAgainBtn = document.getElementById('play-again-btn');
+    const playerNameInput = document.getElementById('player-name');
+    const questionChoiceContainer = document.getElementById('question-choice-container');
+    const timeChoiceContainer = document.getElementById('time-choice-container');
+    const scoreDisplay = document.getElementById('score');
+    const questionCounterDisplay = document.getElementById('question-counter');
+    const timerText = document.getElementById('timer-text');
+    const timerBar = document.getElementById('timer-bar');
+    const questionText = document.getElementById('question-text');
+    const questionImageContainer = document.getElementById('question-image-container');
+    const answersContainer = document.getElementById('answers-container');
+    const finalScoreDisplay = document.getElementById('final-score');
+    const totalTimeDisplay = document.getElementById('total-time');
+    const leaderboardDisplay = document.getElementById('leaderboard');
+    const muteBtn = document.getElementById('mute-btn');
+    const speakerOnIcon = document.getElementById('speaker-on-icon');
+    const speakerOffIcon = document.getElementById('speaker-off-icon');
+
+    // --- DATA OBJECT (from Handbook) ---
+    const handbookData = {
+        chapters: [
+            { title: "Chương 1: Ôn Tập và Bổ Sung", color: "#A0E7E5", topics: [ { title: "Số đến 1 000", content: "Một số như <strong>345</strong> được tạo nên từ 3 trăm, 4 chục và 5 đơn vị. Ta viết: 345 = 300 + 40 + 5. Khi đặt tính cộng trừ, các hàng đơn vị, chục, trăm phải thẳng cột với nhau." }, { title: "Bài toán hai bước tính", content: "Đây là dạng toán cần giải quyết một 'câu hỏi ẩn' trước khi trả lời câu hỏi chính. <strong>Bước 1:</strong> Tìm dữ kiện còn thiếu. <strong>Bước 2:</strong> Dùng dữ kiện đó để giải quyết yêu cầu của bài toán. Luôn tóm tắt bằng sơ đồ để dễ hình dung hơn!" }, { title: "Xem đồng hồ", content: "Có hai cách đọc giờ: <strong>Giờ hơn</strong> và <strong>Giờ kém</strong>. Ví dụ: 8 giờ 45 phút còn được gọi là 9 giờ kém 15 phút. <br> <canvas id='clock-demo' width='150' height='150' class='mx-auto mt-2'></canvas>" }, { title: "Biểu thức & Thứ tự tính", content: "Quy tắc ưu tiên: <strong>Trong ngoặc () trước</strong> -> <strong>Nhân, chia trước</strong> -> <strong>Cộng, trừ sau</strong> (từ trái sang phải). Ví dụ: 12 + 10 : 2 = 12 + 5 = 17." } ] },
+            { title: "Chương 2: Phép Nhân, Chia (phạm vi 1 000)", color: "#FFAEBC", topics: [ { title: "Bảng nhân & chia", content: "Từ một phép nhân, ta có thể lập được hai phép chia tương ứng. Ví dụ: từ <strong>6 × 4 = 24</strong>, ta có <strong>24 : 6 = 4</strong> và <strong>24 : 4 = 6</strong>." }, { title: "Gấp lên, Giảm đi", content: "Muốn <strong>gấp một số lên nhiều lần</strong>, ta lấy số đó <strong>nhân</strong> với số lần. Ví dụ: Gấp 5 lên 3 lần, ta có: 5 × 3 = 15. <br> Muốn <strong>giảm một số đi nhiều lần</strong>, ta lấy số đó <strong>chia</strong> cho số lần. Ví dụ: Giảm 15 đi 3 lần, ta có: 15 : 3 = 5." }, { title: "So sánh số lớn gấp mấy lần số bé", content: "Muốn biết số lớn gấp mấy lần số bé, ta lấy <strong>số lớn chia cho số bé</strong>. Ví dụ: Mẹ 30 tuổi, con 6 tuổi. Tuổi mẹ gấp tuổi con 30 : 6 = 5 (lần)." }, { title: "Phép chia có dư", content: "Quy tắc vàng: <strong>Số dư luôn luôn phải nhỏ hơn số chia</strong>. Ví dụ: 17 : 5 = 3 (dư 2). Ta thấy số dư 2 < 5 (số chia) là đúng." } ] },
+            { title: "Chương 3: Các Số Đến 10 000", color: "#B4F8C8", topics: [ { title: "Số có bốn chữ số", content: "Hệ đếm gồm các hàng: đơn vị, chục, trăm, nghìn. 10 nghìn là 1 chục nghìn (10 000). Để so sánh hai số, ta so sánh từng cặp chữ số từ hàng lớn nhất (hàng nghìn) trở đi." }, { title: "Chu vi", content: "Chu vi là tổng độ dài các cạnh bao quanh một hình. <strong>Công thức tính chu vi HCN: (dài + rộng) × 2</strong>. <strong>Công thức tính chu vi HV: cạnh × 4</strong>." }, { title: "Góc vuông & Hình học", content: "Dùng ê-ke để nhận biết góc vuông. Hình chữ nhật có 4 góc vuông. Hình vuông là hình chữ nhật đặc biệt có 4 cạnh bằng nhau." }, { title: "Tháng, năm", content: "Một năm có 12 tháng. Dùng mẹo nắm tay để biết tháng có 30 hay 31 ngày. Tháng 2 đặc biệt có 28 hoặc 29 ngày (vào năm nhuận)." } ] },
+            { title: "Chương 4: Các Số Đến 100 000", color: "#FBE7C6", topics: [ { title: "Số có năm chữ số", content: "Hệ đếm mở rộng đến hàng chục nghìn, trăm nghìn. 10 chục nghìn = 1 trăm nghìn (100 000). Các quy tắc tính toán cộng, trừ, nhân, chia vẫn giữ nguyên." }, { title: "Diện tích", content: "Diện tích là độ lớn bề mặt của một hình. Đơn vị là xăng-ti-mét vuông (cm²). <strong>Công thức tính diện tích HCN: dài × rộng</strong>. <strong>Công thức tính diện tích HV: cạnh × cạnh</strong>." }, { title: "Tiền Việt Nam", content: "Học cách nhận biết các mệnh giá tiền, tính tổng tiền khi mua hàng và tính số tiền được trả lại. Đây là ứng dụng toán học vào cuộc sống hàng ngày!" } ] }
+        ],
+        quizzes: { "chapter1": [ { q: "Kết quả của biểu thức 20 + 30 : 5 là bao nhiêu?", o: ["10", "26", "25"], a: "26" }, { q: "Trong phép tính ? - 15 = 40, số cần tìm là:", o: ["25", "55", "65"], a: "55" }, { q: "Đồng hồ chỉ 7 giờ 50 phút, còn được gọi là:", o: ["8 giờ kém 10 phút", "7 giờ kém 10 phút", "8 giờ kém 50 phút"], a: "8 giờ kém 10 phút" }, { q: "Số La Mã XIX tương ứng với số nào?", o: ["21", "19", "29"], a: "19" } ], "chapter2": [ { q: "Mẹ 35 tuổi, con 7 tuổi. Tuổi mẹ gấp mấy lần tuổi con?", o: ["28 lần", "5 lần", "6 lần"], a: "5 lần" }, { q: "Giảm 48 đi 6 lần ta được:", o: ["8", "42", "54"], a: "8" }, { q: "Trong phép chia cho 8, số dư lớn nhất có thể là:", o: ["8", "9", "7"], a: "7" }, { q: "Tìm 1/4 của 32 kg", o: ["8 kg", "28 kg", "128 kg"], a: "8 kg" } ], "chapter3": [ { q: "Một hình chữ nhật có chiều dài 12cm, chiều rộng 8cm. Chu vi của nó là:", o: ["20cm", "96cm", "40cm"], a: "40cm" }, { q: "Số lớn nhất có 4 chữ số khác nhau là:", o: ["9999", "9876", "1023"], a: "9876" }, { q: "Một trận bóng đá bắt đầu lúc 15 giờ và kéo dài 90 phút. Trận đấu kết thúc lúc mấy giờ?", o: ["16 giờ 30 phút", "16 giờ", "17 giờ"], a: "16 giờ 30 phút" } ], "chapter4": [ { q: "Một sân chơi hình vuông có cạnh 10m. Diện tích sân chơi đó là:", o: ["40 m", "100 m²", "20 m²"], a: "100 m²" }, { q: "Bạn An mua 1 quyển truyện giá 18.000 đồng và 1 cây bút giá 5.000 đồng. An đưa cô bán hàng 50.000 đồng. Hỏi An được trả lại bao nhiêu tiền?", o: ["23.000 đồng", "32.000 đồng", "27.000 đồng"], a: "27.000 đồng" }, { q: "So sánh: 98.765 và 100.000", o: ["98.765 > 100.000", "98.765 < 100.000", "98.765 = 100.000"], a: "98.765 < 100.000" } ] },
+        challenges: [ { title: "Bài toán logic", problem: "Trong một cái túi kín có 5 viên bi đỏ và 4 viên bi xanh. Không nhìn vào túi, em phải lấy ra ít nhất bao nhiêu viên bi để chắc chắn rằng em có được 2 viên bi cùng màu?", hint: "Hãy nghĩ đến trường hợp 'xui xẻo' nhất. Nếu em bốc viên thứ nhất màu đỏ, viên thứ hai màu xanh thì sao? Viên thứ ba sẽ có màu gì?", answer: "Cần lấy ít nhất 3 viên bi. Vì trong trường hợp xấu nhất, 2 viên đầu tiên lấy ra có 2 màu khác nhau (1 đỏ, 1 xanh). Viên thứ 3 chắc chắn sẽ trùng màu với 1 trong 2 viên đã lấy." }, { title: "Bài toán Giả thuyết tạm", problem: "Vừa gà vừa chó, Bó lại cho tròn, Ba mươi sáu con, Một trăm chân chẵn. Hỏi có mấy gà, mấy chó?", hint: "Hãy giả sử tất cả 36 con đều là gà. Khi đó tổng số chân là bao nhiêu? So sánh với số chân thực tế để tìm ra sự chênh lệch nhé.", answer: "Có 22 con gà và 14 con chó. <br><strong>Cách giải:</strong> Giả sử tất cả 36 con đều là gà, thì có 36 × 2 = 72 (chân). <br>Số chân hụt đi so với thực tế là 100 - 72 = 28 (chân). <br>Mỗi con chó hơn con gà 2 chân. <br>Số con chó là 28 : 2 = 14 (con). <br>Số con gà là 36 - 14 = 22 (con)." }, { title: "Bài toán trồng cây", problem: "Người ta trồng cây ở một bên của một đoạn đường dài 20m. Biết rằng khoảng cách giữa các cây là 5m và cả hai đầu đường đều có trồng cây. Hỏi người ta đã trồng tất cả bao nhiêu cây?", hint: "Hãy vẽ sơ đồ đoạn thẳng ra. Nếu có 2 cây thì có 1 khoảng cách. Nếu có 3 cây thì có 2 khoảng cách. Vậy số cây và số khoảng cách liên hệ với nhau như thế nào?", answer: "Có tất cả 5 cây. <br><strong>Cách giải:</strong> Số khoảng cách giữa các cây là: 20 : 5 = 4 (khoảng cách). <br>Vì cả hai đầu đường đều trồng cây nên số cây sẽ nhiều hơn số khoảng cách là 1. <br>Số cây là: 4 + 1 = 5 (cây)." } ]
+    };
+
+    // --- GAME STATE VARIABLES ---
+    let playerName = '';
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let TOTAL_QUESTIONS = 10;
+    let TIME_PER_QUESTION = 30;
+    let timeLeft = TIME_PER_QUESTION;
+    let timerInterval = null;
+    let currentCorrectAnswer = null;
+    let gameStartTime = 0;
+    let questionPool = [];
+
+    // --- AUDIO SETUP ---
+    let isMuted = false;
+    let audioInitialized = false;
+    const correctSound = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 } }).toDestination();
+    const incorrectSound = new Tone.FMSynth({ harmonicity: 3, modulationIndex: 10, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.5 } }).toDestination();
+    const backgroundMusic = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "amsine", harmonicity: 1.1 }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.5 } }).toDestination();
+    backgroundMusic.volume.value = -18;
+    const musicLoop = new Tone.Loop(time => {
+        backgroundMusic.triggerAttackRelease(["C4", "E4", "G4"], "8n", time);
+        backgroundMusic.triggerAttackRelease(["A3", "C4", "E4"], "8n", time + Tone.Time("4n"));
+        backgroundMusic.triggerAttackRelease(["F3", "A3", "C4"], "8n", time + Tone.Time("2n"));
+        backgroundMusic.triggerAttackRelease(["G3", "B3", "D4"], "8n", time + Tone.Time("2n + 4n"));
+    }, "1m").start(0);
+    
+    // --- MAIN VIEW CONTROLLER ---
+    function showView(viewName) {
+        document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`nav-${viewName}`).classList.add('active');
+
+        document.querySelectorAll('.main-view').forEach(view => view.classList.add('hidden'));
+        document.getElementById(`${viewName}-view`).classList.remove('hidden');
+
+        // Render content if it's the first time
+        const viewContainer = document.getElementById(`${viewName}-view`);
+        if (viewContainer.innerHTML.trim() === '') {
+             if (viewName === 'learn') viewContainer.innerHTML = generateLearnPracticeView();
+             else if (viewName === 'challenge') viewContainer.innerHTML = generateChallengeView();
+             else if (viewName === 'tools') viewContainer.innerHTML = generateToolsView();
+        }
+        
+        // Post-render initializations
+        if (viewName === 'learn') {
+            const clockCanvas = document.getElementById('clock-demo');
+            if (clockCanvas) initClock(clockCanvas, { h: 8, m: 45 }, false);
+            renderQuiz('chapter1');
+        } else if (viewName === 'tools') {
+            const interactiveClockCanvas = document.getElementById('interactive-clock-canvas');
+            if (interactiveClockCanvas) initClock(interactiveClockCanvas, { h:3, m: 30 }, true);
+            setupConverters();
+        }
+        window.scrollTo(0, 0);
+    }
+    
+    // --- GAME LOGIC FUNCTIONS ---
+    function startGame() {
+        playerName = playerNameInput.value || 'Người chơi';
+        currentQuestionIndex = 0;
+        score = 0;
+        scoreDisplay.textContent = score;
+        gameStartTime = Date.now();
+        buildQuestionPool();
+        if (!audioInitialized) { Tone.start(); Tone.Transport.start(); audioInitialized = true; }
+        if (!isMuted) { Tone.Destination.mute = false; }
+        gameOverlayContainer.classList.remove('pointer-events-none');
+        gameScreen.classList.remove('hidden');
+        showNextQuestion();
+    }
+    function showNextQuestion() {
+        if (currentQuestionIndex >= TOTAL_QUESTIONS) {
+            endGame(); return;
+        }
+        currentQuestionIndex++;
+        questionCounterDisplay.textContent = `${currentQuestionIndex} / ${TOTAL_QUESTIONS}`;
+        resetStateForNewQuestion();
+        const question = generateQuestion();
+        currentCorrectAnswer = question.correctAnswer;
+        questionText.textContent = question.question;
+        if (question.image) {
+            questionImageContainer.innerHTML = question.image;
+            questionText.className = 'font-bold tracking-wider text-gray-800 text-2xl mb-2';
+        } else if (['word', 'expression', 'findX', 'comparison'].includes(question.type)) {
+            questionText.className = 'font-bold tracking-wider text-gray-800 text-2xl sm:text-3xl';
+        } else {
+            questionText.className = 'font-bold tracking-wider text-gray-800 text-4xl sm:text-5xl';
+        }
+        const shuffledAnswers = question.answers.sort(() => Math.random() - 0.5);
+        shuffledAnswers.forEach(answer => {
+            const button = document.createElement('button');
+            button.className = 'p-4 btn-answer rounded-lg text-2xl font-bold transition-all transform hover:scale-105 disabled:transform-none';
+            button.textContent = answer;
+            button.onclick = () => handleAnswerSelection(answer, button);
+            answersContainer.appendChild(button);
+        });
+        startTimer();
+    }
+    function endGame() {
+        const totalTime = Math.round((Date.now() - gameStartTime) / 1000);
+        const minutes = Math.floor(totalTime / 60).toString().padStart(2, '0');
+        const seconds = (totalTime % 60).toString().padStart(2, '0');
+        gameScreen.classList.add('hidden');
+        endScreen.classList.remove('hidden');
+        finalScoreDisplay.textContent = score;
+        totalTimeDisplay.textContent = `${minutes}:${seconds}`;
+        saveScore(playerName, score);
+        displayLeaderboard();
+    }
+    function handlePlayAgain() {
+        endScreen.classList.add('hidden');
+        gameOverlayContainer.classList.add('pointer-events-none');
+        showView('game');
+    }
+    
+    // --- QUESTION GENERATION (GAME) ---
+    function buildQuestionPool() {
+        questionPool = [];
+        const numBasic = Math.round(TOTAL_QUESTIONS * 0.4);
+        const numIntermediate = Math.round(TOTAL_QUESTIONS * 0.3);
+        const numAdvanced = TOTAL_QUESTIONS - numBasic - numIntermediate;
+        for (let i = 0; i < numBasic; i++) questionPool.push('basic');
+        for (let i = 0; i < numIntermediate; i++) questionPool.push('intermediate');
+        for (let i = 0; i < numAdvanced; i++) questionPool.push('advanced');
+        questionPool.sort(() => Math.random() - 0.5); // Shuffle
+    }
+    function generateQuestion() {
+        const questionType = questionPool[currentQuestionIndex - 1];
+        let generator;
+        if (questionType === 'basic') {
+            const basicGenerators = [() => generateArithmeticQuestion(0), () => generateArithmeticQuestion(1)];
+            generator = basicGenerators[Math.floor(Math.random() * basicGenerators.length)];
+        } else if (questionType === 'intermediate') {
+            const intermediateGenerators = [generateWordProblem, generateOrderOfOperations, generateUnitConversionQuestion];
+            generator = intermediateGenerators[Math.floor(Math.random() * intermediateGenerators.length)];
+        } else { // advanced
+            const advancedGenerators = [generateGeometryQuestion, generateFindXQuestion, generateComparisonQuestion];
+            generator = advancedGenerators[Math.floor(Math.random() * advancedGenerators.length)];
+        }
+        return generator();
+    }
+    const generateArithmeticQuestion = (level) => { let num1, num2, operator, question, correctAnswer; const opSymbol = {'*': '×', '/': ':'}; switch(level) { case 0: operator = Math.random() < 0.5 ? '+' : '-'; num1 = Math.floor(Math.random()*30)+1; num2 = Math.floor(Math.random()*30)+1; if(operator==='-'&&num1<num2)[num1,num2]=[num2,num1]; break; case 1: operator=['+','-','*'][Math.floor(Math.random()*3)]; if(operator==='*'){num1=Math.floor(Math.random()*9)+2;num2=Math.floor(Math.random()*9)+2;}else{num1=Math.floor(Math.random()*80)+20;num2=Math.floor(Math.random()*80)+10;if(operator==='-'&&num1<num2)[num1,num2]=[num2,num1];} break; default: operator=Math.random()<0.5?'*':'/'; if(operator==='/'){correctAnswer=Math.floor(Math.random()*10)+2;num2=Math.floor(Math.random()*8)+2;num1=correctAnswer*num2;}else{num1=Math.floor(Math.random()*15)+5;num2=Math.floor(Math.random()*10)+5;} break; } if(operator==='+')correctAnswer=num1+num2; if(operator==='-')correctAnswer=num1-num2; if(operator==='*')correctAnswer=num1*num2; if(operator==='/')correctAnswer=num1/num2; question=`${num1} ${opSymbol[operator] || operator} ${num2}`; return{question:`${question} = ?`,answers:generateAnswers(correctAnswer),correctAnswer,type:'arithmetic'}; };
+    const generateWordProblem = () => { const problemTemplates=[{text:(n1,n2)=>`Lớp 3A có ${n1} học sinh, lớp 3B có ${n2} học sinh. Hỏi cả hai lớp có tất cả bao nhiêu học sinh?`,calculate:(n1,n2)=>n1+n2,gen_nums:()=>[Math.floor(Math.random()*15)+20,Math.floor(Math.random()*15)+20]},{text:(n1,n2)=>`Một cửa hàng buổi sáng bán được ${n1} kg gạo. Buổi chiều bán được ít hơn buổi sáng ${n2} kg. Hỏi buổi chiều bán được bao nhiêu kg gạo?`,calculate:(n1,n2)=>n1-n2,gen_nums:()=>{const n2=Math.floor(Math.random()*20)+10;const n1=Math.floor(Math.random()*20)+30+n2;return[n1,n2];}},{text:(n1,n2)=>`Mỗi hộp có ${n1} cái bút chì. Hỏi ${n2} hộp như vậy có tất cả bao nhiêu cái bút chì?`,calculate:(n1,n2)=>n1*n2,gen_nums:()=>[Math.floor(Math.random()*5)+2,Math.floor(Math.random()*8)+3]},{text:(n1,n2)=>`Có ${n1} quả cam, chia đều vào ${n2} đĩa. Hỏi mỗi đĩa có bao nhiêu quả cam?`,calculate:(n1,n2)=>n1/n2,gen_nums:()=>{const n2=Math.floor(Math.random()*5)+2;const result=Math.floor(Math.random()*5)+3;const n1=n2*result;return[n1,n2];}}]; const template=problemTemplates[Math.floor(Math.random()*problemTemplates.length)];const[num1,num2]=template.gen_nums();const question=template.text(num1,num2);const correctAnswer=template.calculate(num1,num2);return{question,answers:generateAnswers(correctAnswer),correctAnswer,type:'word'}; };
+    const generateOrderOfOperations = () => { let question,correctAnswer;const type=Math.floor(Math.random()*2);if(type===0){const op1=Math.random()<0.5?'+':'-';const num1=Math.floor(Math.random()*50)+10;const num2=Math.floor(Math.random()*8)+2;const num3=Math.floor(Math.random()*8)+2;if(op1==='-'&&num1<num2*num3){question=`${num2*num3}+${num1}-${num2} × ${num3}`;correctAnswer=num1;}else{question=`${num1} ${op1} ${num2} × ${num3}`;correctAnswer=(op1==='+')?num1+(num2*num3):num1-(num2*num3);}}else{const op1=Math.random()<0.5?'+':'-';const num3=Math.floor(Math.random()*8)+2;const quotient=Math.floor(Math.random()*8)+2;const num2=num3*quotient;const num1=Math.floor(Math.random()*50)+10;if(op1==='-'&&num1<quotient){question=`${quotient}+${num1}-${num2} : ${num3}`;correctAnswer=num1;}else{question=`${num1} ${op1} ${num2} : ${num3}`;correctAnswer=(op1==='+')?num1+quotient:num1-quotient;}} return{question:`Tính: ${question} = ?`,answers:generateAnswers(correctAnswer),correctAnswer,type:'expression'}; };
+    const generateGeometryQuestion = () => { const shapes=[{question:'Có bao nhiêu hình tam giác trong hình sau?',image:`<svg width="100" height="100" viewBox="0 0 100 100"><polygon points="50,10 90,90 10,90" style="fill:none;stroke:black;stroke-width:3"/><line x1="50" y1="10" x2="50" y2="90" style="stroke:black;stroke-width:3"/></svg>`,correctAnswer:2},{question:'Có bao nhiêu hình tam giác trong hình sau?',image:`<svg width="100" height="100" viewBox="0 0 100 100"><rect x="10" y="10" width="80" height="80" style="fill:none;stroke:black;stroke-width:3"/><line x1="10" y1="10" x2="90" y2="90" style="stroke:black;stroke-width:3"/><line x1="90" y1="10" x2="10" y2="90" style="stroke:black;stroke-width:3"/></svg>`,correctAnswer:8},{question:'Có bao nhiêu hình tứ giác trong hình sau?',image:`<svg width="120" height="80" viewBox="0 0 120 80"><rect x="10" y="10" width="100" height="60" style="fill:none;stroke:black;stroke-width:3"/><line x1="60" y1="10" x2="60" y2="70" style="stroke:black;stroke-width:3"/></svg>`,correctAnswer:3}]; const selectedShape=shapes[Math.floor(Math.random()*shapes.length)];return{...selectedShape,answers:generateAnswers(selectedShape.correctAnswer,5),type:'geometry'}; };
+    const generateFindXQuestion = () => { let question,correctAnswer;const operator=['+','-','*'][Math.floor(Math.random()*3)];const num1=Math.floor(Math.random()*10)+2;const num2=Math.floor(Math.random()*10)+5;switch(operator){case'+':correctAnswer=num2;question=`x + ${num1} = ${num1+num2}`;break;case'-':correctAnswer=num1+num2;question=`x - ${num1} = ${num2}`;break;case'*':correctAnswer=num2;question=`${num1} × x = ${num1*num2}`;break;} return{question,answers:generateAnswers(correctAnswer),correctAnswer,type:'findX'}; };
+    const generateComparisonQuestion = () => { const num1=Math.floor(Math.random()*10)+1;const num2=Math.floor(Math.random()*10)+1;const num3=Math.floor(Math.random()*10)+1;const num4=Math.floor(Math.random()*10)+1;const expr1=`${num1} × ${num2}`;const expr2=`${num3} + ${num4}`;const val1=num1*num2;const val2=num3+num4;let correctAnswer;if(val1>val2)correctAnswer='>';else if(val1<val2)correctAnswer='<';else correctAnswer='='; return{question:`Điền dấu thích hợp: ${expr1} ... ${expr2}`,answers:['>','<','='],correctAnswer,type:'comparison'}; };
+    const generateUnitConversionQuestion = () => { const conversions=[{q:(n)=>`${n}m`,a:(n)=>n*100,unit:"cm"},{q:(n)=>`${n} giờ`,a:(n)=>n*60,unit:"phút"},{q:(n)=>`${n}dm`,a:(n)=>n*10,unit:"cm"}]; const conv=conversions[Math.floor(Math.random()*conversions.length)];const num=Math.floor(Math.random()*8)+2;const question=`${conv.q(num)} = ? ${conv.unit}`;const correctAnswer=conv.a(num);return{question,answers:generateAnswers(correctAnswer),correctAnswer,type:'word'}; };
+    const generateAnswers = (correctAnswer, offsetRange=10) => {const answers=new Set([correctAnswer]);while(answers.size<4){const offset=Math.floor(Math.random()*offsetRange)+1;const randomSign=Math.random()<0.5?1:-1;let wrongAnswer=correctAnswer+(offset*randomSign);if(wrongAnswer>=0&&wrongAnswer!==correctAnswer){answers.add(wrongAnswer);}}return Array.from(answers);};
+
+    // --- GAME HELPER FUNCTIONS ---
+    function handleAnswerSelection(selectedAnswer, button) {
+        clearInterval(timerInterval); disableAnswerButtons();
+        const isCorrect = selectedAnswer.toString() === currentCorrectAnswer.toString();
+        if (isCorrect) {
+            score += timeLeft > 0 ? (10 + timeLeft) : 10;
+            scoreDisplay.textContent = score;
+            button.className = 'p-4 bg-green-500 rounded-lg text-2xl font-bold transition-all disabled:opacity-100 text-white';
+            button.style.boxShadow = '0 4px #15803d'; correctSound.triggerAttackRelease("C5", "8n");
+        } else {
+            button.className = 'p-4 bg-red-500 rounded-lg text-2xl font-bold transition-all disabled:opacity-100 text-white';
+            button.style.boxShadow = '0 4px #b91c1c'; highlightCorrectAnswer(); incorrectSound.triggerAttackRelease("C3", "4n");
+        }
+        setTimeout(showNextQuestion, 1500);
+    }
+    function startTimer() {
+        timeLeft = TIME_PER_QUESTION; timerText.textContent = `${timeLeft}s`; timerBar.style.width = '100%';
+        timerBar.classList.remove('bg-yellow-500', 'bg-red-600'); timerBar.classList.add('bg-green-500');
+        timerInterval = setInterval(() => {
+            timeLeft--; timerText.textContent = `${timeLeft}s`;
+            timerBar.style.width = `${(timeLeft / TIME_PER_QUESTION) * 100}%`;
+            if (timeLeft <= 5) { timerBar.classList.remove('bg-green-500', 'bg-yellow-500'); timerBar.classList.add('bg-red-600'); }
+            else if (timeLeft <= 10) { timerBar.classList.remove('bg-green-500'); timerBar.classList.add('bg-yellow-500'); }
+            if (timeLeft <= 0) { clearInterval(timerInterval); timeOut(); }
+        }, 1000);
+    }
+    function timeOut() { disableAnswerButtons(); highlightCorrectAnswer(); incorrectSound.triggerAttackRelease("C3", "4n"); setTimeout(showNextQuestion, 1500); }
+    const resetStateForNewQuestion = () => { clearInterval(timerInterval); answersContainer.innerHTML = ''; questionText.textContent = ''; questionImageContainer.innerHTML = ''; questionText.className = 'font-bold tracking-wider text-gray-800'; };
+    const disableAnswerButtons = () => { Array.from(answersContainer.children).forEach(button => { button.disabled = true; }); };
+    function highlightCorrectAnswer() { Array.from(answersContainer.children).forEach(button => { if (button.textContent.toString() === currentCorrectAnswer.toString()) { button.className = 'p-4 bg-green-500 rounded-lg text-2xl font-bold transition-all disabled:opacity-100 text-white'; button.style.boxShadow = '0 4px #15803d'; } }); }
+    const saveScore = (name, newScore) => { const scores = JSON.parse(localStorage.getItem('mathGameScoresV3')) || []; scores.push({ name, score: newScore, date: new Date().getTime() }); scores.sort((a, b) => b.score - a.score); localStorage.setItem('mathGameScoresV3', JSON.stringify(scores.slice(0, 10))); };
+    function displayLeaderboard() {
+        const scores = JSON.parse(localStorage.getItem('mathGameScoresV3')) || []; leaderboardDisplay.innerHTML = '';
+        if (scores.length === 0) { leaderboardDisplay.innerHTML = '<p class="text-white/70 text-center">Chưa có ai chơi!</p>'; return; }
+        const currentPlayerEntryDate = scores.find(s => s.name === playerName && s.score === score)?.date;
+        scores.forEach((s, index) => {
+            const isCurrentPlayer = s.name === playerName && s.score === score && s.date === currentPlayerEntryDate;
+            const entryDiv = document.createElement('div');
+            entryDiv.className = `flex justify-between items-center p-3 rounded-lg ${isCurrentPlayer ? 'bg-yellow-400/80 highlight-player' : 'bg-white/30'}`;
+            entryDiv.innerHTML = `<div class="flex items-center"><span class="font-bold w-8 text-lg text-white">${index + 1}.</span><span class="font-semibold text-lg text-white">${s.name}</span></div><span class="font-bold text-xl text-white">${s.score}</span>`;
+            leaderboardDisplay.appendChild(entryDiv);
+        });
+    }
+    const toggleMute = () => { isMuted = !isMuted; Tone.Destination.mute = isMuted; speakerOnIcon.classList.toggle('hidden', isMuted); speakerOffIcon.classList.toggle('hidden', !isMuted); };
+
+    // --- HANDBOOK VIEW GENERATION ---
+    const generateLearnPracticeView = () => { let chapterHtml = '<div class="space-y-8">'; handbookData.chapters.forEach(chapter => { chapterHtml += `<section><h2 class="text-2xl font-bold mb-4 text-white" style="border-bottom: 2px solid rgba(255,255,255,0.5); padding-bottom: 8px;">${chapter.title}</h2><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">${chapter.topics.map(topic => `<div class="content-card p-4 rounded-lg shadow-md border-l-4" style="border-color: ${chapter.color};"><h3 class="font-semibold text-lg mb-2 text-gray-800">${topic.title}</h3><div class="text-gray-600 text-sm">${topic.content}</div></div>`).join('')}</div></section>`; }); chapterHtml += '</div>'; return `<div class="bg-white/10 backdrop-blur-sm p-6 rounded-lg shadow-lg">${chapterHtml}<hr class="my-8 border-white/30"><div id="practice-section" class="bg-white p-6 rounded-lg shadow-lg"><h2 class="text-2xl font-bold text-center mb-4 text-gray-800">Ôn tập kiến thức</h2><div class="flex justify-center gap-2 mb-6 flex-wrap"><button onclick="renderQuiz('chapter1')" class="px-4 py-2 bg-[#A0E7E5] rounded-full font-semibold">Chương 1</button><button onclick="renderQuiz('chapter2')" class="px-4 py-2 bg-[#FFAEBC] rounded-full font-semibold">Chương 2</button><button onclick="renderQuiz('chapter3')" class="px-4 py-2 bg-[#B4F8C8] rounded-full font-semibold">Chương 3</button><button onclick="renderQuiz('chapter4')" class="px-4 py-2 bg-[#FBE7C6] rounded-full font-semibold">Chương 4</button></div><div id="quiz-container"></div></div></div>`; };
+    const generateChallengeView = () => { let html = '<div class="space-y-6">'; handbookData.challenges.forEach((challenge, index) => { html += `<div class="bg-white p-6 rounded-lg shadow-lg border-l-4 border-[#BC4749]"><h3 class="text-xl font-bold mb-2">${challenge.title}</h3><p class="mb-4">${challenge.problem}</p><div class="flex gap-2 flex-wrap"><button onclick="toggleAnswer('hint-${index}', 'answer-${index}', this)" class="px-4 py-2 bg-yellow-400 text-yellow-900 rounded-full font-semibold text-sm">Gợi ý</button><button onclick="getAIExplanation(${index})" class="px-4 py-2 bg-purple-500 text-white rounded-full font-semibold text-sm flex items-center gap-1">✨ Nhờ AI giải thích</button></div><p id="hint-${index}" class="hidden mt-3 p-3 bg-yellow-100 rounded-md text-sm">${challenge.hint}</p><p id="answer-${index}" class="hidden mt-3 p-3 bg-green-100 rounded-md">${challenge.answer}</p><div id="ai-explanation-${index}" class="hidden mt-3 p-4 bg-purple-50 border border-purple-200 rounded-md text-sm"></div></div>`; }); html += '</div>'; return html; };
+    
+    function createConverterUI(type, unitData) {
+        const title = type === 'length' ? 'Độ Dài' : 'Khối Lượng';
+        const sortedUnitKeys = Object.keys(unitData).sort((a, b) => unitData[b].rate - unitData[a].rate);
+
+        let combineInputs = '';
+        sortedUnitKeys.forEach(unitKey => {
+            const unit = unitData[unitKey];
+            combineInputs += `<div class="flex items-center gap-2">
+                <input type="number" min="0" class="w-full p-2 border rounded-md" data-unit="${unitKey}" placeholder="0">
+                <span class="font-semibold w-24 text-sm text-gray-600 text-right pr-2">${unit.name} (${unitKey})</span>
+            </div>`;
+        });
+
+        let combineOutputs = '';
+        sortedUnitKeys.forEach(unitKey => {
+            const unit = unitData[unitKey];
+            combineOutputs += `<option value="${unitKey}" ${unitKey === (type === 'length' ? 'm' : 'kg') ? 'selected' : ''}>${unit.name} (${unitKey})</option>`;
+        });
+
+        let breakdownOutputs = '';
+        sortedUnitKeys.forEach(unitKey => {
+            const unit = unitData[unitKey];
+            breakdownOutputs += `<div class="flex items-center gap-2">
+                <div class="w-full p-2 border rounded-md bg-gray-100 font-bold" data-unit-output="${unitKey}"></div>
+                <span class="font-semibold w-24 text-sm text-gray-600 text-right pr-2">${unit.name} (${unitKey})</span>
+            </div>`;
+        });
+        
+        let breakdownInputs = '';
+         sortedUnitKeys.forEach(unitKey => {
+            const unit = unitData[unitKey];
+            breakdownInputs += `<option value="${unitKey}" ${unitKey === (type === 'length' ? 'm' : 'kg') ? 'selected' : ''}>${unit.name} (${unitKey})</option>`;
+        });
+
+        return `<div class="bg-white p-6 rounded-lg shadow-lg">
+            <h3 class="text-xl font-bold text-center mb-4">Công Cụ Đổi ${title}</h3>
+            <div class="border-b border-gray-200 mb-4">
+                <nav class="-mb-px flex justify-center gap-6" aria-label="Tabs">
+                    <button class="converter-tab active py-2 px-1 font-medium text-sm text-gray-500 hover:text-gray-700" data-tab-target="${type}-combine">Quy đổi gộp</button>
+                    <button class="converter-tab py-2 px-1 font-medium text-sm text-gray-500 hover:text-gray-700" data-tab-target="${type}-breakdown">Quy đổi phân tích</button>
+                </nav>
+            </div>
+
+            <!-- Combine Tab -->
+            <div id="${type}-combine">
+                <p class="text-center text-sm text-gray-500 mb-4">Nhập một hoặc nhiều giá trị để gộp và quy đổi.</p>
+                <div id="${type}-multi-input" class="space-y-2 mb-2 border-2 border-dashed p-3 rounded-lg">${combineInputs}</div>
+                <div class="text-center font-bold text-2xl text-gray-500 my-2">=</div>
+                <div class="flex items-center gap-2 mt-2">
+                    <div id="${type}-output" class="w-full p-2 border rounded-md bg-gray-100 font-bold min-h-[42px] text-lg"></div>
+                    <select id="${type}-to" class="p-2 border rounded-md bg-white text-base">${combineOutputs}</select>
+                </div>
+            </div>
+
+            <!-- Breakdown Tab -->
+            <div id="${type}-breakdown" class="hidden">
+                 <p class="text-center text-sm text-gray-500 mb-4">Nhập một giá trị để phân tích ra các đơn vị khác.</p>
+                <div class="flex items-center gap-2 mb-2">
+                    <input type="number" min="0" id="${type}-breakdown-input" class="w-full p-2 border rounded-md" placeholder="0">
+                    <select id="${type}-breakdown-from" class="p-2 border rounded-md bg-white text-base">${breakdownInputs}</select>
+                </div>
+                 <div class="text-center font-bold text-2xl text-gray-500 my-2">=</div>
+                <div id="${type}-breakdown-output" class="space-y-2 mt-2 border-2 border-dashed p-3 rounded-lg">${breakdownOutputs}</div>
+            </div>
+        </div>`;
+    }
+
+    const generateToolsView = () => {
+        const lengthUnits = {
+            'km': { name: 'Ki-lô-mét', rate: 1000000 }, 'hm': { name: 'Héc-tô-mét', rate: 100000 },
+            'dam': { name: 'Đề-ca-mét', rate: 10000 }, 'm': { name: 'Mét', rate: 1000 },
+            'dm': { name: 'Đề-xi-mét', rate: 100 }, 'cm': { name: 'Xăng-ti-mét', rate: 10 },
+            'mm': { name: 'Mi-li-mét', rate: 1 }
+        };
+        const massUnits = {
+            'tan': { name: 'Tấn', rate: 1000000 }, 'ta': { name: 'Tạ', rate: 100000 },
+            'yen': { name: 'Yến', rate: 10000 }, 'kg': { name: 'Ki-lô-gam', rate: 1000 },
+            'hg': { name: 'Héc-tô-gam', rate: 100 }, 'dag': { name: 'Đề-ca-gam', rate: 10 },
+            'g': { name: 'Gam', rate: 1 }
+        };
+
+        const lengthConverterHTML = createConverterUI('length', lengthUnits);
+        const massConverterHTML = createConverterUI('mass', massUnits);
+        
+        return `<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="bg-white p-6 rounded-lg shadow-lg lg:col-span-2">
+                <h3 class="text-xl font-bold text-center mb-4">✨ AI Sáng Tạo Bài Toán</h3>
+                <p class="text-center text-sm text-gray-600 mb-4">Nhập 2-3 từ khóa (ví dụ: mèo con, bánh quy, chia đều), AI sẽ tạo ra một bài toán vui!</p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" id="story-keywords" class="w-full p-2 border rounded-md" placeholder="Nhập từ khóa...">
+                    <button onclick="generateMathStory()" class="w-full sm:w-auto px-6 py-2 bg-blue-500 text-white rounded-md font-semibold">Tạo bài toán</button>
+                </div>
+                <div id="math-story-result" class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md text-sm min-h-[100px]"></div>
+            </div>
+            <div id="length-converter-container" class="lg:col-span-1">${lengthConverterHTML}</div>
+            <div id="mass-converter-container" class="lg:col-span-1">${massConverterHTML}</div>
+            <div class="bg-white p-6 rounded-lg shadow-lg lg:col-span-2">
+                <h3 class="text-xl font-bold text-center mb-2">Đồng Hồ Tương Tác</h3>
+                <p class="text-center text-sm text-gray-500 mb-2">Kéo kim đồng hồ để xem giờ nhé!</p>
+                <canvas id="interactive-clock-canvas" width="300" height="300" class="mx-auto"></canvas>
+                <div id="clock-time-display" class="text-center text-2xl font-bold mt-2 text-[#BC4749]"></div>
+                 <div class="mt-4 flex flex-col sm:flex-row gap-2">
+                    <input type="text" id="time-input" class="w-full p-2 border rounded-md" placeholder="Nhập thời gian, ví dụ: 8 giờ 45 phút...">
+                    <button onclick="setTimeFromInput()" class="w-full sm:w-auto px-6 py-2 bg-blue-500 text-white rounded-md font-semibold">Đặt giờ</button>
+                </div>
+            </div>
+        </div>`;
+    };
+
+    // --- HANDBOOK LOGIC ---
+    let handbookQuiz = [], handbookScore = 0, handbookQuestionIndex = 0;
+    function renderQuiz(chapterKey) { handbookQuiz = handbookData.quizzes[chapterKey] || []; handbookScore = 0; handbookQuestionIndex = 0; displayHandbookQuestion(); }
+    function displayHandbookQuestion() {
+        const quizContainer = document.getElementById('quiz-container');
+        if (handbookQuestionIndex < handbookQuiz.length) {
+            const question = handbookQuiz[handbookQuestionIndex];
+            quizContainer.innerHTML = `<div class="mb-4"><p class="text-lg font-semibold">${handbookQuestionIndex + 1}. ${question.q}</p></div><div class="space-y-3">${question.o.map(option => `<button onclick="checkAnswer('${option.replace(/'/g, "\\'")}', this)" class="quiz-option block w-full text-left p-3 bg-gray-100 rounded-lg hover:bg-gray-200 border-2 border-transparent">${option}</button>`).join('')}</div><div id="feedback" class="mt-4 text-center font-bold h-6"></div>`;
+        } else {
+            quizContainer.innerHTML = `<div class="text-center"><h3 class="text-xl font-bold">Hoàn thành!</h3><p class="my-2">Bạn đã trả lời đúng ${handbookScore} trên ${handbookQuiz.length} câu hỏi.</p><div class="chart-container my-4"><canvas id="scoreChart"></canvas></div><button onclick="renderQuiz(Object.keys(handbookData.quizzes).find(key => handbookData.quizzes[key] === handbookQuiz))" class="px-6 py-2 bg-blue-500 text-white rounded-full font-semibold">Làm lại</button></div>`;
+            renderScoreChart();
+        }
+    }
+    const renderScoreChart = () => { const ctx = document.getElementById('scoreChart').getContext('2d'); new Chart(ctx, { type: 'doughnut', data: { labels: ['Đúng', 'Sai'], datasets: [{ data: [handbookScore, handbookQuiz.length - handbookScore], backgroundColor: ['#A0E7E5', '#FFAEBC'], borderColor: ['#FFFFFF'], borderWidth: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } }); };
+    function checkAnswer(selectedOption, buttonElement) {
+        const question = handbookQuiz[handbookQuestionIndex]; const feedbackEl = document.getElementById('feedback');
+        document.querySelectorAll('.quiz-option').forEach(btn => btn.disabled = true);
+        if (selectedOption === question.a) { handbookScore++; buttonElement.classList.add('correct'); feedbackEl.textContent = "Chính xác! 🎉"; feedbackEl.style.color = '#006A71'; }
+        else { buttonElement.classList.add('incorrect'); feedbackEl.textContent = `Sai rồi! Đáp án đúng là: ${question.a}`; feedbackEl.style.color = '#D83A56'; document.querySelectorAll('.quiz-option').forEach(btn => { if (btn.textContent.trim() === question.a) btn.classList.add('correct'); }); }
+        handbookQuestionIndex++; setTimeout(displayHandbookQuestion, 2000);
+    }
+    const toggleAnswer = (hintId, answerId, button) => { const hintEl = document.getElementById(hintId); const answerEl = document.getElementById(answerId); if (hintEl.classList.contains('hidden')) { hintEl.classList.remove('hidden'); button.textContent = 'Xem đáp án'; button.classList.remove('bg-yellow-400', 'text-yellow-900'); button.classList.add('bg-green-500', 'text-white'); } else { answerEl.classList.remove('hidden'); button.style.display = 'none'; } };
+    
+    // --- GEMINI AI & TOOLS ---
+    async function callGemini(prompt, retries = 3, delay = 1000) {
+        const apiKey = "AIzaSyBhc_9B3Ji_1j_ogh5j1daWuajdwEnjhc8"; 
+
+        let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+        const payload = { contents: chatHistory };
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+        
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+                const result = await response.json();
+                if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    return result.candidates[0].content.parts[0].text;
+                } else {
+                    throw new Error("Invalid response structure from Gemini API");
+                }
+            } catch (error) {
+                if (i === retries - 1) {
+                    console.error("Lỗi gọi API Gemini sau nhiều lần thử:", error);
+                    return "Rất tiếc, đã có lỗi xảy ra khi kết nối với AI. Vui lòng kiểm tra lại API Key và kết nối mạng.";
+                }
+                await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
+            }
+        }
+    }
+    async function getAIExplanation(index) {
+        const problem = handbookData.challenges[index].problem; const explanationDiv = document.getElementById(`ai-explanation-${index}`);
+        explanationDiv.classList.remove('hidden'); explanationDiv.innerHTML = '<div class="flex justify-center items-center"><div class="loader"></div></div>';
+        const prompt = `Hãy đóng vai một giáo viên tiểu học thân thiện, giải thích bài toán sau cho học sinh lớp 3 một cách chi tiết, từng bước một. Sử dụng ngôn ngữ đơn giản, dễ hiểu. Bài toán: "${problem}". Yêu cầu giải thích bao gồm: 1. Tóm tắt bài toán. 2. Các bước giải. 3. Kết luận. 4. Kiến thức liên quan.`;
+        const response = await callGemini(prompt); explanationDiv.innerHTML = response.replace(/\n/g, '<br>');
+    }
+    async function generateMathStory() {
+        const keywords = document.getElementById('story-keywords').value; const resultDiv = document.getElementById('math-story-result');
+        if (!keywords.trim()) { resultDiv.textContent = 'Vui lòng nhập ít nhất một từ khóa.'; return; }
+        resultDiv.innerHTML = '<div class="flex justify-center items-center"><div class="loader"></div></div>';
+        const prompt = `Viết một bài toán vui và ngắn gọn cho học sinh lớp 3, sử dụng các từ khóa sau: "${keywords}". Bài toán nên có một câu hỏi rõ ràng và có thể giải được bằng phép tính cộng, trừ, nhân, hoặc chia trong phạm vi 1000. Cung cấp cả lời giải chi tiết bên dưới. Định dạng câu trả lời bằng cách sử dụng **đề bài** và **lời giải** làm tiêu đề.`;
+        const response = await callGemini(prompt); resultDiv.innerHTML = response.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+    }
+    function setupConverters() {
+        const lengthRates = { km: { rate: 1000000 }, hm: { rate: 100000 }, dam: { rate: 10000 }, m: { rate: 1000 }, dm: { rate: 100 }, cm: { rate: 10 }, mm: { rate: 1 } };
+        const massRates = { tan: { rate: 1000000 }, ta: { rate: 100000 }, yen: { rate: 10000 }, kg: { rate: 1000 }, hg: { rate: 100 }, dag: { rate: 10 }, g: { rate: 1 } };
+
+        function setupConverter(type, rates) {
+            const container = document.getElementById(`${type}-converter-container`);
+            if (!container) return;
+
+            const tabs = container.querySelectorAll('.converter-tab');
+            const tabContents = {
+                combine: container.querySelector(`#${type}-combine`),
+                breakdown: container.querySelector(`#${type}-breakdown`)
+            };
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    const targetId = tab.dataset.tabTarget;
+                    Object.values(tabContents).forEach(content => content.classList.add('hidden'));
+                    container.querySelector(`#${targetId}`).classList.remove('hidden');
+                });
+            });
+
+            // --- Combine Logic ---
+            const multiInputContainer = tabContents.combine.querySelector(`#${type}-multi-input`);
+            const outputSelect = tabContents.combine.querySelector(`#${type}-to`);
+            const outputDisplay = tabContents.combine.querySelector(`#${type}-output`);
+
+            const updateCombineConversion = () => {
+                let totalInBaseUnit = 0;
+                const inputs = multiInputContainer.querySelectorAll('input[type="number"]');
+                inputs.forEach(input => {
+                    const value = parseFloat(input.value) || 0;
+                    if (value > 0) {
+                        const unit = input.dataset.unit;
+                        totalInBaseUnit += value * rates[unit].rate;
+                    }
+                });
+                if (totalInBaseUnit === 0) { outputDisplay.textContent = ''; return; }
+                const toUnit = outputSelect.value;
+                const result = totalInBaseUnit / rates[toUnit].rate;
+                outputDisplay.textContent = result.toLocaleString('vi-VN');
+            };
+            multiInputContainer.addEventListener('input', updateCombineConversion);
+            outputSelect.addEventListener('change', updateCombineConversion);
+
+            // --- Breakdown Logic ---
+            const breakdownInput = tabContents.breakdown.querySelector(`#${type}-breakdown-input`);
+            const breakdownFromSelect = tabContents.breakdown.querySelector(`#${type}-breakdown-from`);
+            const breakdownOutputContainer = tabContents.breakdown.querySelector(`#${type}-breakdown-output`);
+            
+            const updateBreakdownConversion = () => {
+                const value = parseFloat(breakdownInput.value) || 0;
+                const fromUnit = breakdownFromSelect.value;
+                const sortedUnits = Object.keys(rates).sort((a, b) => rates[b].rate - rates[a].rate);
+                let remainingValueInBase = value * rates[fromUnit].rate;
+                
+                sortedUnits.forEach(unitKey => {
+                    const unitRate = rates[unitKey].rate;
+                    const outputField = breakdownOutputContainer.querySelector(`[data-unit-output="${unitKey}"]`);
+                    if (outputField) {
+                        const amount = Math.floor(remainingValueInBase / unitRate);
+                        outputField.textContent = amount > 0 ? amount.toLocaleString('vi-VN') : '';
+                        remainingValueInBase -= amount * unitRate;
+                    }
+                });
+            };
+            breakdownInput.addEventListener('input', updateBreakdownConversion);
+            breakdownFromSelect.addEventListener('change', updateBreakdownConversion);
+        }
+
+        setupConverter('length', lengthRates);
+        setupConverter('mass', massRates);
+    }
+
+    function initClock(canvas, initialTime, isInteractive) {
+        if (!canvas || canvas.dataset.initialized) return;
+        canvas.dataset.initialized = 'true';
+
+        const ctx = canvas.getContext('2d');
+        const radius = canvas.height / 2;
+        ctx.translate(radius, radius);
+        const clockRadius = radius * 0.90;
+
+        let state = {
+            hour: initialTime.h,
+            minute: initialTime.m,
+            dragging: false,
+            hand: null // 'hour' or 'minute'
+        };
+
+        const drawClock = () => { ctx.clearRect(-radius, -radius, canvas.width, canvas.height); drawFace(ctx, clockRadius); drawNumbers(ctx, clockRadius); drawHands(ctx, clockRadius, state.hour, state.minute); if(isInteractive) updateTimeDisplay(); };
+        const drawFace = (ctx, radius) => { ctx.beginPath(); ctx.arc(0, 0, radius, 0, 2 * Math.PI); ctx.fillStyle = 'white'; ctx.fill(); const grad = ctx.createRadialGradient(0, 0, radius * 0.95, 0, 0, radius * 1.05); grad.addColorStop(0, '#333'); grad.addColorStop(0.5, 'white'); grad.addColorStop(1, '#333'); ctx.strokeStyle = grad; ctx.lineWidth = radius * 0.1; ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, radius * 0.05, 0, 2 * Math.PI); ctx.fillStyle = '#333'; ctx.fill(); };
+        const drawNumbers = (ctx, radius) => { ctx.font = radius * 0.15 + "px Quicksand"; ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillStyle = '#333'; for (let num = 1; num <= 12; num++) { ctx.save(); const ang = num * Math.PI / 6; ctx.rotate(ang); ctx.translate(0, -radius * 0.85); ctx.rotate(-ang); ctx.fillText(num.toString(), 0, 0); ctx.restore(); } };
+        const drawHands = (ctx, radius, hour, minute) => { let hourAngle = (hour % 12 + minute / 60) * (Math.PI / 6); let minuteAngle = (minute % 60) * (Math.PI / 30); drawHand(ctx, hourAngle, radius * 0.5, radius * 0.07, '#333'); drawHand(ctx, minuteAngle, radius * 0.8, radius * 0.07, '#333'); };
+        const drawHand = (ctx, pos, length, width, color) => { ctx.save(); ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.moveTo(0, 0); ctx.rotate(pos); ctx.lineTo(0, -length); ctx.stroke(); ctx.restore(); };
+        
+        const updateTimeDisplay = () => {
+            const display = document.getElementById('clock-time-display'); if(!display) return;
+            const h_val = state.hour < 0 ? (state.hour % 12 + 12) % 12 : state.hour % 12;
+            const m_val = state.minute < 0 ? (state.minute % 60 + 60) % 60 : state.minute % 60;
+            let h_for_display = Math.floor(h_val);
+            if(h_for_display === 0) h_for_display = 12;
+
+            const m_for_display = Math.floor(m_val);
+            const minuteText = m_for_display < 10 ? '0' + m_for_display : m_for_display;
+            let timeString = `${h_for_display} giờ ${minuteText} phút`;
+            if (m_for_display > 30 && m_for_display < 60) {
+                let nextHour = (h_for_display % 12) + 1;
+                const minutesToNextHour = 60 - m_for_display;
+                timeString += ` (hoặc ${nextHour} giờ kém ${minutesToNextHour} phút)`;
+            }
+            display.textContent = timeString;
+        };
+        
+        const getMouseAngle = e => { const rect = canvas.getBoundingClientRect(); const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left - radius; const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top - radius; let angle = Math.atan2(y, x) + Math.PI / 2; if (angle < 0) angle += 2 * Math.PI; return angle; };
+        
+        if (isInteractive) {
+            const startDrag = (e) => {
+                state.dragging = true;
+                const angle = getMouseAngle(e);
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = (e.clientX || e.touches[0].clientX) - rect.left - radius;
+                const mouseY = (e.clientY || e.touches[0].clientY) - rect.top - radius;
+
+                const minuteAngle = ((state.minute % 60) * Math.PI / 30);
+                const hourAngle = ((state.hour % 12 + (state.minute % 60) / 60) * Math.PI / 6);
+
+                const minuteHandX = Math.sin(minuteAngle) * (radius * 0.8);
+                const minuteHandY = -Math.cos(minuteAngle) * (radius * 0.8);
+                const distToMinuteHand = Math.hypot(mouseX - minuteHandX, mouseY - minuteHandY);
+                
+                const hourHandX = Math.sin(hourAngle) * (radius * 0.5);
+                const hourHandY = -Math.cos(hourAngle) * (radius * 0.5);
+                const distToHourHand = Math.hypot(mouseX - hourHandX, mouseY - hourHandY);
+                
+                state.hand = (distToMinuteHand < distToHourHand) ? 'minute' : 'hour';
+
+                moveDrag(e);
+            };
+            const stopDrag = () => { state.dragging = false; state.hand = null; };
+            const moveDrag = (e) => {
+                if (!state.dragging) return;
+                e.preventDefault();
+                const angle = getMouseAngle(e);
+                
+                if (state.hand === 'hour') {
+                    // Khi kéo kim giờ, cả hai kim sẽ di chuyển đồng bộ
+                    const newHourValue = (angle * 6 / Math.PI);
+                    state.hour = newHourValue;
+                    state.minute = (newHourValue - Math.floor(newHourValue)) * 60;
+                } else if (state.hand === 'minute') {
+                     // Khi kéo kim phút, kim giờ sẽ di chuyển theo một cách tự nhiên
+                    const oldMinute = state.minute % 60;
+                    const newMinute = (angle * 30 / Math.PI);
+                    
+                    // Xử lý khi kim phút đi qua mốc 12 giờ
+                    if (oldMinute > 50 && newMinute < 10) {
+                        state.hour = Math.floor(state.hour) + 1; 
+                    } else if (oldMinute < 10 && newMinute > 50) {
+                        state.hour = Math.floor(state.hour) - 1;
+                    }
+                    
+                    state.minute = newMinute;
+                    // Cập nhật lại phần lẻ của giờ dựa trên phút mới
+                    state.hour = Math.floor(state.hour) + (state.minute / 60);
+                }
+                drawClock();
+            };
+            
+            canvas.addEventListener('mousedown', startDrag);
+            canvas.addEventListener('mouseup', stopDrag);
+            canvas.addEventListener('mouseout', stopDrag);
+            canvas.addEventListener('mousemove', moveDrag);
+            canvas.addEventListener('touchstart', startDrag, { passive: false });
+            canvas.addEventListener('touchend', stopDrag);
+            canvas.addEventListener('touchmove', moveDrag, { passive: false });
+
+            canvas.setTime = (h, m) => {
+                state.hour = h;
+                state.minute = m;
+                drawClock();
+            };
+        }
+        drawClock();
+    }
+
+    function setTimeFromInput() {
+        const input = document.getElementById('time-input');
+        const text = input.value.toLowerCase().trim();
+        if (!text) return;
+
+        const kemRegex = /(\d{1,2})\s*giờ\s*kém\s*(\d{1,2})/;
+        const honRegex = /(\d{1,2})\s*giờ\s*(\d{1,2})?/;
+        
+        let h = 0, m = 0;
+        let match;
+
+        if ((match = text.match(kemRegex))) {
+            let targetHour = parseInt(match[1]);
+            let minutesTo = parseInt(match[2]);
+            h = (targetHour - 1 + 12) % 12;
+            if (h === 0) h=12; // 1 giờ kém -> h=0 -> 12
+            if (targetHour === 12) h = 11;
+            
+            m = 60 - minutesTo;
+        } else if ((match = text.match(honRegex))) {
+            h = parseInt(match[1]);
+            m = parseInt(match[2] || '0');
+        } else {
+            alert('Định dạng thời gian không hợp lệ. Vui lòng thử lại, ví dụ: "3 giờ 15 phút" hoặc "5 giờ kém 10".');
+            return;
+        }
+
+        const canvas = document.getElementById('interactive-clock-canvas');
+        if (canvas && canvas.setTime) {
+            canvas.setTime(h, m);
+        }
+    }
+
+
+    // --- EVENT LISTENERS ---
+    startBtn.addEventListener('click', startGame);
+    playAgainBtn.addEventListener('click', handlePlayAgain);
+    muteBtn.addEventListener('click', toggleMute);
+    questionChoiceContainer.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') {
+            document.querySelectorAll('#question-choice-container .btn-choice').forEach(btn => btn.classList.remove('btn-choice-active'));
+            e.target.classList.add('btn-choice-active'); TOTAL_QUESTIONS = parseInt(e.target.dataset.questions);
+        }
+    });
+    timeChoiceContainer.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') {
+            document.querySelectorAll('#time-choice-container .btn-choice').forEach(btn => btn.classList.remove('btn-choice-active'));
+            e.target.classList.add('btn-choice-active'); TIME_PER_QUESTION = parseInt(e.target.dataset.time);
+        }
+    });
+    
+    // --- INITIAL LOAD ---
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.nav-button').forEach(button => {
+            button.addEventListener('click', () => showView(button.id.split('-')[1]));
+        });
+        showView('game');
+    });
+
+</script>
+</body>
+</html>
+
+
